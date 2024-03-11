@@ -1,4 +1,5 @@
 import java.util.*;
+import java.io.*;
 
 public class TTTManager
 {  
@@ -10,6 +11,7 @@ public class TTTManager
 
     private int boardSize;
     private char playerLetter;
+    private char computerLetter; 
 
     public TTTManager(int boardSize, char playerLetter)
     {
@@ -19,7 +21,15 @@ public class TTTManager
         computerArray = new int[boardSize*boardSize];
         this.boardSize = boardSize;
         this.playerLetter = playerLetter;
-
+        if (playerLetter == 'X')
+        {
+            computerLetter = 'O';
+        }
+        else
+        {
+            computerLetter = 'X';
+        }
+        
         generateWinCombinations();
     }
 
@@ -56,25 +66,25 @@ public class TTTManager
         winCombinations[boardSize*2+1] = leftDiagonal;
     }
 
-    public void printBoard()
+    public void printBoard(PrintStream output)
     {
         for (int i = 0; i < boardSize; i++)
         {
-            System.out.println(String.join("", Collections.nCopies(boardSize, "+---")) + "+");
+            output.println(String.join("", Collections.nCopies(boardSize, "+---")) + "+");
             for (int j = 0; j < boardSize; j++)
             {
                 if (gameBoard[i][j] == EMPTY_CHAR)
                 {
-                    System.out.print("|   ");
+                    output.print("|   ");
                 }
                 else
                 {
-                    System.out.print("| " + gameBoard[i][j] + " ");
+                    output.print("| " + gameBoard[i][j] + " ");
                 }
             }
-            System.out.println("|");
+            output.println("|");
         }
-        System.out.println(String.join("", Collections.nCopies(boardSize, "+---")) + "+");
+        output.println(String.join("", Collections.nCopies(boardSize, "+---")) + "+");
     }
 
     public void oneRound(Scanner input)
@@ -82,25 +92,110 @@ public class TTTManager
         System.out.print("Where would you like to play?\nEnter coordinates in the form x,y: ");
         String[] coords = input.nextLine().split(",");
         int xCoord = Integer.parseInt(coords[0]);
-        int yCoord = Integer.parseInt(coords[1]);
-        while (xCoord < 0 || xCoord > boardSize-1 || yCoord < 0 || yCoord > boardSize-1 || gameBoard[boardSize-1-yCoord][xCoord] != EMPTY_CHAR)
+        int yCoord = boardSize-1-Integer.parseInt(coords[1]);
+        while (xCoord < 0 || xCoord > boardSize-1 || yCoord < 0 || yCoord > boardSize-1 || gameBoard[yCoord][xCoord] != EMPTY_CHAR)
         {
             System.out.print("The coordinates (" + coords[0] + "," + coords[1] + ") are either out of range or already filled. Please try again: ");
             coords = input.nextLine().split(",");
             xCoord = Integer.parseInt(coords[0]);
-            yCoord = Integer.parseInt(coords[1]);
+            yCoord = boardSize-1-Integer.parseInt(coords[1]);
         }
 
-        playerArray[(boardSize-1-yCoord)*boardSize+xCoord] = 1;
-        gameBoard[boardSize-1-yCoord][xCoord] = playerLetter;
-        printBoard();
+        playerArray[(yCoord)*boardSize+xCoord] = 1;
+        gameBoard[yCoord][xCoord] = playerLetter;
+        printBoard(System.out);
+        if (!checkWinner(playerArray))
+        {
+            System.out.println("\nMy turn...\n");
+            computerMove();
+            printBoard(System.out);
+        }
+    }
+
+    private void computerMove()
+    {
+        for (int i = 0; i < gameBoard.length; i++)
+        {
+            for (int j = 0; j < gameBoard[i].length; j++)
+            {
+                if (gameBoard[i][j] == EMPTY_CHAR)
+                {
+                    computerArray[(i*boardSize)+j] = 1;
+                    if (checkWinner(computerArray))
+                    {
+                        gameBoard[i][j] = computerLetter;
+                        return;
+                    }
+                    else
+                    {
+                        computerArray[(i*boardSize)+j] = 0;
+                    }
+                }
+            }
+        }
+
+        for (int i = 0; i < gameBoard.length; i++)
+        {
+            for (int j = 0; j < gameBoard[i].length; j++)
+            {
+                if (gameBoard[i][j] == EMPTY_CHAR)
+                {
+                    playerArray[(i*boardSize)+j] = 1;
+                    if (checkWinner(playerArray))
+                    {
+                        playerArray[(i*boardSize)+j] = 0;
+                        computerArray[(i*boardSize)+j] = 1;
+                        gameBoard[i][j] = computerLetter;
+                        return;
+                    }
+                    else
+                    {
+                        playerArray[(i*boardSize)+j] = 0;
+                    }
+                }
+            }
+        }
+
+        Random r = new Random();
+        int row;
+        int col;
+        do
+        {
+            row = boardSize-1-r.nextInt(boardSize);
+            col = r.nextInt(boardSize);
+        } while (gameBoard[row][col] != EMPTY_CHAR);
+
+        computerArray[(row)*boardSize+col] = 1;
+        gameBoard[row][col] = computerLetter;
+    }
+
+    private boolean checkWinner(int[] array)
+    {
+        boolean hasWon = false;
+        for (int[] combination : winCombinations)
+        {
+            hasWon = true;
+            for (int i = 0; i < combination.length; i++)
+            {
+                if (combination[i] == 1 && array[i] != 1)
+                {
+                    hasWon = false;
+                    break;
+                }
+            }
+            if (hasWon)
+            {
+                return hasWon;
+            }
+        }
+        return hasWon;
     }
 
     private boolean fullBoard()
     {
         for (int i = 0; i < gameBoard.length; i++)
         {
-            for (int j = 0; j < gameBoard[0].length; j++)
+            for (int j = 0; j < gameBoard[i].length; j++)
             {
                 if (gameBoard[i][j] == EMPTY_CHAR)
                 {
@@ -111,44 +206,20 @@ public class TTTManager
         return true;
     }
 
-    public String winner()
+    public int winner()
     {
-        boolean playerWin;
-        boolean computerWin;
-
-        if (fullBoard())
+        if (checkWinner(playerArray))
         {
-            return "The Cat";
+            return 0;
         }
-
-        for (int[] combination : winCombinations)
+        else if (checkWinner(computerArray))
         {
-            playerWin = true;
-            computerWin = true;
-            for (int i = 0; i < combination.length; i++)
-            {
-                if (combination[i] == 1 && playerArray[i] != 1)
-                {
-                    playerWin = false;
-                }
-                if (combination[i] == 1 && computerArray[i] != 1)
-                {
-                    computerWin = false;
-                }
-                if (!playerWin && !computerWin)
-                {
-                    break;
-                }
-            }
-            if (playerWin)
-            {
-                return "You";
-            }
-            else if (computerWin)
-            {
-                return "The Computer";
-            }
+            return 1;
         }
-        return null;
+        else if (fullBoard())
+        {
+            return 2;
+        }
+        return -1;
     }
 }
